@@ -22,6 +22,7 @@ def tokenize(text):
 file_pattern = os.path.join("modern-poetry", "**", "*.json")
 files = glob.glob(file_pattern, recursive=True)
 
+unique_poems_data = []
 seen_poems = set()
 total_poems = 0
 duplicate_count = 0
@@ -49,6 +50,7 @@ for file in files:
                     # Tokenize unique poems and update counter
                     tokens = tokenize(poem_text)
                     token_counter.update(tokens)
+                    unique_poems_data.append((poem_text, tokens))
 
 # Get the 10 most common tokens
 most_common_tokens = token_counter.most_common(100)
@@ -66,5 +68,6 @@ for token, count in most_common_tokens:
     print(f"{token}: {count}")
 
 print([token for token, count in most_common_tokens])
-print("Dream count: ", token_counter["月"])
+print("Flower count: ", token_counter["花"])
+print("Water count: ", token_counter["水"])
 

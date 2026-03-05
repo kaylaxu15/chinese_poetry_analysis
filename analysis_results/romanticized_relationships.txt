@@ -1,0 +1,14 @@
+Semantic Shift: Romanticized Relationships with Nature & Dreams
+======================================================================
+  Pair                                     Tang       Modern            Δ   Direction
+----------------------------------------------------------------------
+  person–moon   (nature/romance)         0.2532       0.0377      -0.2155   ↓ further in modern
+  person–dream  (dream)                  0.2959       0.0705      -0.2254   ↓ further in modern
+  person–flower (nature/beauty)          0.3307       0.0846      -0.2460   ↓ further in modern
+  moon–dream    (romanticized dream)     0.3208       0.1289      -0.1919   ↓ further in modern
+
+Interpretation:
+  • person–moon: concepts LESS linked in modern poetry (-0.215)
+  • person–dream: concepts LESS linked in modern poetry (-0.225)
+  • person–flower: concepts LESS linked in modern poetry (-0.246)
+  • moon–dream: concepts LESS linked in modern poetry (-0.192)
