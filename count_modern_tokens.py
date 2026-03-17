@@ -69,5 +69,4 @@ for token, count in most_common_tokens:
 
 print([token for token, count in most_common_tokens])
 print("Flower count: ", token_counter["花"])
-print("Water count: ", token_counter["水"])
 
