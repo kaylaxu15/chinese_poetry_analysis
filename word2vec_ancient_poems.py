@@ -21,11 +21,11 @@ from analyze_semantic_shifts import analyze_pairs
 # ---------------------------------------------------------------------------
 
 ancient_corpus = [tokens for _, tokens in sampled_poems]
-modern_corpus = [tokens for _, tokens in unique_poems_data]
+modern_corpus  = [tokens for _, tokens in unique_poems_data]
 
-# -----------------------------------------
+# ---------------------------------------------------------------------------
 # Train Word2Vec
-# -----------------------------------------
+# ---------------------------------------------------------------------------
 
 print("Loading Word2Vec model")
 ancient_model = Word2Vec(
@@ -49,24 +49,24 @@ modern_model = Word2Vec(
     epochs=10,
 )
 
-# --------------------------------------------------
-# Save model and word vectors (fixed paths)
-# --------------------------------------------------
+# ---------------------------------------------------------------------------
+# Save model and word vectors
+# ---------------------------------------------------------------------------
 ancient_model.save("model/tang_word2vec.model")
 ancient_model.wv.save("model/tang_word2vec.wordvectors")
 modern_model.save("model/modern_word2vec.model")
 modern_model.wv.save("model/modern_word2vec.wordvectors")
 print("Models and word vectors saved.")
 
-# -----------------------------------------------------
+# ---------------------------------------------------------------------------
 # Quick sanity checks
-# -----------------------------------------------------
+# ---------------------------------------------------------------------------
 print(f"Ancient vocabulary size: {len(ancient_model.wv)}")
 print(f"Modern vocabulary size:  {len(modern_model.wv)}")
 
-# -----------------------------------------------------
+# ---------------------------------------------------------------------------
 # Side-by-side nearest neighbour comparison
-# -----------------------------------------------------
+# ---------------------------------------------------------------------------
 words_of_interest = ["有", "人", "不"]
 TOPN = 10
 collocates_lines = ["Top 10 Collocates with Cosine Similarity\n", "=" * 60 + "\n\n"]
@@ -100,9 +100,16 @@ for word in words_of_interest:
 with open("analysis_results/top_10_collocates.txt", "w", encoding="utf-8") as f:
     f.writelines(collocates_lines)
 
-
-# -----------------------------------------------------
+# ---------------------------------------------------------------------------
 # Side-by-side analysis of word pair relationships
-# -----------------------------------------------------
-
-analyze_pairs(ancient_model, modern_model, output_path="analysis_results/romanticized_relationships.txt")
+# Cosine similarity uses Word2Vec embeddings (word-tokenized).
+# PPMI is computed from character-level co-occurrence (corpora re-tokenized
+# to single characters inside analyze_pairs).
+# ---------------------------------------------------------------------------
+analyze_pairs(
+    ancient_model,
+    modern_model,
+    ancient_corpus=ancient_corpus,   # passed for character-level PMI
+    modern_corpus=modern_corpus,     # passed for character-level PMI
+    output_path="analysis_results/romanticized_relationships.txt",
+)
