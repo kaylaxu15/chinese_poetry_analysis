@@ -2,14 +2,15 @@ from gensim.models import Word2Vec
 from scipy.linalg import orthogonal_procrustes
 import numpy as np
 import os, glob, json, re
-import jieba
-from hanziconv import HanziConv
-from transformers import AutoTokenizer
+import opencc
+import opencc
+from count_ancient_tokens import sampled_poems as classical_sentences
+from count_modern_tokens import unique_poems_data as modern_sentences
 
-tokenizer = AutoTokenizer.from_pretrained("Jihuai/bert-ancient-chinese")
+converter = opencc.OpenCC('t2s')
 
 def tokenize_ancient(text):
-    tokens = tokenizer.tokenize(text)
+    tokens = list(text)
     # bert tokenizers add [CLS], [SEP] and ## subword prefixes — strip them
     tokens = [t.replace('##', '') for t in tokens]
     tokens = [t for t in tokens if t not in ('[CLS]', '[SEP]', '[UNK]', '[PAD]')]
@@ -17,44 +18,6 @@ def tokenize_ancient(text):
 
 def cosine_sim(v1, v2):
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-
-def clean(text):
-    text = re.sub(r'【.*?】', '', text)  # strip 【京本作X】 style notes
-    text = re.sub(r'〔.*?〕', '', text)  # strip 〔...〕 variant brackets
-    text = re.sub(r'（.*?）', '', text)  # strip （...） editorial parentheticals
-    text = re.sub(r'\(.*?\)', '', text)  # strip ASCII parens too
-    text = re.sub(r'[a-zA-Z0-9\s。，、「」！《》？・；：/"]', '', text)
-    text = HanziConv.toSimplified(text)
-    return text
-
-def get_poems(ancient=True):
-    file_pattern = os.path.join("tang_poems", "poet.tang.*.json") if ancient else os.path.join("modern-poetry", "**", "*.json")
-    files = glob.glob(file_pattern, recursive=True)
-
-    sentences = []
-    seen = set()
-
-    for file in files:
-        with open(file, "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-            except json.JSONDecodeError:
-                continue
-
-        if isinstance(data, list):
-            for poem in data:
-                paragraphs = poem.get("paragraphs") or poem.get("content", [])
-                if not paragraphs:
-                    continue
-                poem_text = clean("".join(paragraphs).strip())
-                if poem_text in seen:
-                    continue
-                seen.add(poem_text)
-                # character-level for classical, jieba for modern
-                tokens = tokenize_ancient(poem_text) if ancient else list(jieba.cut(poem_text))
-                sentences.append(tokens)
-
-    return sentences
 
 def build_auto_anchors(model_classical, model_modern,
                        min_count_classical=50, min_count_modern=20,
@@ -146,8 +109,6 @@ def word_shift(word):
 
 if __name__ == "__main__":
     # --- Load and train ---
-    classical_sentences = get_poems(True)
-    modern_sentences    = get_poems(False)
 
     print(f"Classical poems: {len(classical_sentences)}")
     print(f"Modern poems:    {len(modern_sentences)}")

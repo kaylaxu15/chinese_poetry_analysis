@@ -12,16 +12,23 @@ import logging
 from gensim.models import Word2Vec
 
 # Import sampled poems and tokenizer 
-from count_ancient_tokens import sampled_poems
-from count_modern_tokens import unique_poems_data
-from analyze_semantic_shifts import analyze_pairs
+from count_ancient_tokens import classical_poems
+from count_modern_tokens import modern_poems
+from analyze_semantic_shifts import (
+    analyze_pairs,
+    analyze_nearest_neighbours,
+    analyze_pmi_collocates,
+    char_tokenize_corpus,
+    build_cooccurrence,
+)
 
 # ---------------------------------------------------------------------------
 # Build corpus: list of token lists (already tokenized in count_modern_tokens)
 # ---------------------------------------------------------------------------
 
-ancient_corpus = [tokens for _, tokens in sampled_poems]
-modern_corpus  = [tokens for _, tokens in unique_poems_data]
+ancient_corpus = classical_poems
+modern_corpus  = modern_poems
+PMI_WINDOW = 3
 
 # ---------------------------------------------------------------------------
 # Train Word2Vec
@@ -31,22 +38,22 @@ print("Loading Word2Vec model")
 ancient_model = Word2Vec(
     sentences=ancient_corpus,
     vector_size=128,
-    window=5,
+    window=3,
     min_count=2,
     workers=4,
     sg=1,
-    epochs=10,
+    epochs=15,
     compute_loss=True,
 )
 
 modern_model = Word2Vec(
     sentences=modern_corpus,
     vector_size=128,
-    window=5,
+    window=3,
     min_count=2,
     workers=4,
     sg=1,
-    epochs=10,
+    epochs=15,
 )
 
 # ---------------------------------------------------------------------------
@@ -65,51 +72,41 @@ print(f"Ancient vocabulary size: {len(ancient_model.wv)}")
 print(f"Modern vocabulary size:  {len(modern_model.wv)}")
 
 # ---------------------------------------------------------------------------
-# Side-by-side nearest neighbour comparison
+# Pre-build char corpora and co-occurrence tables once (shared by both files)
 # ---------------------------------------------------------------------------
-words_of_interest = ["有", "人", "不"]
-TOPN = 10
-collocates_lines = ["Top 10 Collocates with Cosine Similarity\n", "=" * 60 + "\n\n"]
+ancient_chars = char_tokenize_corpus(ancient_corpus)
+modern_chars  = char_tokenize_corpus(modern_corpus)
 
-print("\n--- Nearest neighbours (cosine similarity) ---\n")
-
-for word in words_of_interest:
-    # Ancient neighbours
-    if word in ancient_model.wv:
-        ancient_nbrs = ancient_model.wv.most_similar(word, topn=TOPN)
-        ancient_str = ", ".join(f"{w}({s:.3f})" for w, s in ancient_nbrs)
-    else:
-        ancient_str = "(not in vocab)"
-
-    # Modern neighbours
-    if word in modern_model.wv:
-        modern_nbrs = modern_model.wv.most_similar(word, topn=TOPN)
-        modern_str = ", ".join(f"{w}({s:.3f})" for w, s in modern_nbrs)
-    else:
-        modern_str = "(not in vocab)"
-
-    print(f"Word: {word}")
-    print(f"  TANG:   {ancient_str}")
-    print(f"  MODERN: {modern_str}")
-    print()
-
-    collocates_lines.append(f"Word: {word}\n")
-    collocates_lines.append(f"  TANG:   {ancient_str}\n")
-    collocates_lines.append(f"  MODERN: {modern_str}\n\n")
-
-with open("analysis_results/top_10_collocates.txt", "w", encoding="utf-8") as f:
-    f.writelines(collocates_lines)
+anc_uni, anc_cooc, anc_total = build_cooccurrence(ancient_chars, window=PMI_WINDOW)
+mod_uni, mod_cooc, mod_total = build_cooccurrence(modern_chars,  window=PMI_WINDOW)
+# ---------------------------------------------------------------------------
+# File 1: per-word nearest neighbours + PMI collocates
+# ---------------------------------------------------------------------------
+output_lines = []
+analyze_nearest_neighbours(
+    ancient_model, modern_model,
+    words=["山", "风", "天", "花"],
+    topn=10,
+    output_lines=output_lines,
+)
+analyze_pmi_collocates(
+    anc_uni=anc_uni, anc_cooc=anc_cooc, anc_total=anc_total,
+    mod_uni=mod_uni, mod_cooc=mod_cooc, mod_total=mod_total,
+    words=["山", "风", "天", "花"],
+    topn=10,
+    pmi_window=PMI_WINDOW,
+    output_lines=output_lines,
+)
+with open("analysis_results/words_analysis.txt", "w", encoding="utf-8") as f:
+    f.writelines(output_lines)
 
 # ---------------------------------------------------------------------------
-# Side-by-side analysis of word pair relationships
-# Cosine similarity uses Word2Vec embeddings (word-tokenized).
-# PPMI is computed from character-level co-occurrence (corpora re-tokenized
-# to single characters inside analyze_pairs).
+# File 2: pair-level cosine + PPMI
 # ---------------------------------------------------------------------------
 analyze_pairs(
-    ancient_model,
-    modern_model,
-    ancient_corpus=ancient_corpus,   # passed for character-level PMI
-    modern_corpus=modern_corpus,     # passed for character-level PMI
-    output_path="analysis_results/romanticized_relationships.txt",
+    ancient_model, modern_model,
+    anc_uni=anc_uni, anc_cooc=anc_cooc, anc_total=anc_total,
+    mod_uni=mod_uni, mod_cooc=mod_cooc, mod_total=mod_total,
+    output_path="analysis_results/pairs_analysis.txt",
+    pmi_window=PMI_WINDOW,
 )

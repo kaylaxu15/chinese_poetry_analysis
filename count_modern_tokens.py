@@ -2,21 +2,26 @@ import os
 import json
 import glob
 import re
-import jieba
 from collections import Counter
-from hanziconv import HanziConv
+from collections import Counter
+import opencc
+converter = opencc.OpenCC('t2s')
 
-# clean special characters
+STOP_WORDS = set('的一是不了在我有他这就和你对为之而及且其上来无里何') # most common 25 functional words
+
 def clean(text):
-    text = re.sub(r'[a-zA-Z0-9\s。，、「」！《》？（(）)・；［ ］：/"]', '', text)
-
-    text = HanziConv.toSimplified(text)
-
+    text = re.sub(r'【.*?】', '', text)  # strip 【京本作X】 style notes
+    text = re.sub(r'〔.*?〕', '', text)  # strip 〔...〕 variant brackets
+    text = re.sub(r'（.*?）', '', text)  # strip （...） editorial parentheticals
+    text = re.sub(r'\(.*?\)', '', text)  # strip ASCII parens too
+    text = re.sub(r'[a-zA-Z0-9\s。，、「」！《》？・；：/～"]', '', text)
+    text = converter.convert(text)
+    text = ''.join(ch for ch in text if ch not in STOP_WORDS)
     return text
 
 # Use jieba for tokenization
 def tokenize(text):
-    return list(jieba.cut(text))
+    return list(text)
 
 # Recursively match ALL JSON files inside modern-poetry and subfolders
 file_pattern = os.path.join("modern-poetry", "**", "*.json")
@@ -52,21 +57,23 @@ for file in files:
                     token_counter.update(tokens)
                     unique_poems_data.append((poem_text, tokens))
 
+modern_poems = [tokens for _, tokens in unique_poems_data]
 # Get the 10 most common tokens
 most_common_tokens = token_counter.most_common(100)
 
-print(f"Total modern poems checked: {total_poems}")
-print(f"Duplicate poems found: {duplicate_count}")
-print(f"Unique modern poems: {total_poems - duplicate_count}")
+if __name__ == "__main__":
+    print(f"Total modern poems checked: {total_poems}")
+    print(f"Duplicate poems found: {duplicate_count}")
+    print(f"Unique modern poems: {total_poems - duplicate_count}")
 
-# token counting
-print(f"Total tokens: {sum(token_counter.values())}")
-print(f"Total unique tokens: {len(token_counter)}")
-print(f"Top {len(most_common_tokens)} most common tokens (with counts):")
+    # token counting
+    print(f"Total tokens: {sum(token_counter.values())}")
+    print(f"Total unique tokens: {len(token_counter)}")
+    print(f"Top {len(most_common_tokens)} most common tokens (with counts):")
 
-for token, count in most_common_tokens:
-    print(f"{token}: {count}")
+    for token, count in most_common_tokens:
+        print(f"{token}: {count}")
 
-print([token for token, count in most_common_tokens])
-print("Flower count: ", token_counter["花"])
+    print([token for token, count in most_common_tokens])
+    print("Flower count: ", token_counter["花"])
 

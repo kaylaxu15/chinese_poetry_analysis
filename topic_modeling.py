@@ -4,14 +4,13 @@ import numpy as np
 from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
-from relational_shifts import get_poems
+from count_ancient_tokens import classical_poems
+from count_modern_tokens import modern_poems
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Reconstruct plain strings from your token lists
-classical_sentences = get_poems(True)
-modern_sentences = get_poems(False)
-classical_docs = ["".join(tokens) for tokens in classical_sentences]
-modern_docs    = ["".join(tokens) for tokens in modern_sentences]
+classical_docs = ["".join(tokens) for tokens in classical_poems]
+modern_docs    = ["".join(tokens) for tokens in modern_poems]
 all_docs = classical_docs + modern_docs
 
 # Classical — character-level TF-IDF
