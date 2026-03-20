@@ -14,7 +14,7 @@ def clean(text):
     text = re.sub(r'〔.*?〕', '', text)  # strip 〔...〕 variant brackets
     text = re.sub(r'（.*?）', '', text)  # strip （...） editorial parentheticals
     text = re.sub(r'\(.*?\)', '', text)  # strip ASCII parens too
-    text = re.sub(r'[a-zA-Z0-9\s。，、「」！《》？・；：/～"]', '', text)
+    text = re.sub(r'[a-zA-Z0-9\s。，、「」！《》？・；：/～●"]', '', text)
     text = converter.convert(text)
     text = ''.join(ch for ch in text if ch not in STOP_WORDS)
     return text

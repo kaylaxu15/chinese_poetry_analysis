@@ -21,6 +21,8 @@ PAIRS = [
     ("月", "梦", "moon–dream    (romanticized dream)"),
 ]
 
+def is_standard_cjk(ch):
+    return '\u4e00' <= ch <= '\u9fff'
 
 # ---------------------------------------------------------------------------
 # Character-level tokenization
@@ -30,7 +32,7 @@ def char_tokenize_corpus(corpus):
     """Re-tokenize a corpus (list of token lists) into individual characters."""
     char_corpus = []
     for tokens in corpus:
-        chars = [ch for token in tokens for ch in token if ch.strip()]
+        chars = [ch for token in tokens for ch in token if ch.strip() and is_standard_cjk(ch)]
         if chars:
             char_corpus.append(chars)
     return char_corpus
@@ -40,11 +42,7 @@ def char_tokenize_corpus(corpus):
 # Co-occurrence and PMI
 # ---------------------------------------------------------------------------
 
-def build_cooccurrence(char_corpus, window=5):
-    """
-    Build unigram and co-occurrence counts from a character-tokenized corpus.
-    Returns (unigram_counts, cooc_counts, total_tokens).
-    """
+def build_cooccurrence(char_corpus, window=3):
     unigram_counts = defaultdict(int)
     cooc_counts    = defaultdict(int)
     total_tokens   = 0
@@ -52,6 +50,8 @@ def build_cooccurrence(char_corpus, window=5):
     for doc in char_corpus:
         total_tokens += len(doc)
         for i, target in enumerate(doc):
+            if not is_standard_cjk(target):   # ← add this
+                continue
             unigram_counts[target] += 1
             start = max(0, i - window)
             end   = min(len(doc), i + window + 1)
@@ -59,6 +59,8 @@ def build_cooccurrence(char_corpus, window=5):
                 if j == i:
                     continue
                 context = doc[j]
+                if not is_standard_cjk(context):  # ← and this
+                    continue
                 pair = (min(target, context), max(target, context))
                 cooc_counts[pair] += 1
 
@@ -93,6 +95,9 @@ def top_pmi_collocates(word, unigram_counts, cooc_counts, total_tokens, topn=10)
         elif w2 == word:
             other = w1
         else:
+            continue
+
+        if not is_standard_cjk(other):  # filter for unknown words
             continue
         score = pmi_score(word, other, unigram_counts, cooc_counts, total_tokens)
         if score is not None:
@@ -161,7 +166,7 @@ def analyze_nearest_neighbours(
     if output_lines is None:
         output_lines = []
 
-    header = "Within-Model Nearest Neighbours (Word2Vec cosine similarity)"
+    header = "Nearest Neighbours (Word2Vec Cosine Similarity)"
     output_lines.append(f"\n{header}\n" + "=" * 80 + "\n")
 
     table = Table(
@@ -174,14 +179,14 @@ def analyze_nearest_neighbours(
     table.add_column("Modern top-10", style="green",      justify="left",   min_width=50)
 
     for word in words:
-        anc_str = (
-            ", ".join(f"{w}({s:.3f})" for w, s in ancient_model.wv.most_similar(word, topn=topn))
-            if word in ancient_model.wv else "(not in vocab)"
-        )
-        mod_str = (
-            ", ".join(f"{w}({s:.3f})" for w, s in modern_model.wv.most_similar(word, topn=topn))
-            if word in modern_model.wv else "(not in vocab)"
-        )
+        anc_nbrs = [(w, s) for w, s in ancient_model.wv.most_similar(word, topn=topn*2)
+            if is_standard_cjk(w)][:topn] if word in ancient_model.wv else []
+        mod_nbrs = [(w, s) for w, s in modern_model.wv.most_similar(word, topn=topn*2)
+                    if is_standard_cjk(w)][:topn] if word in modern_model.wv else []
+
+        anc_str = ", ".join(f"{w}({s:.3f})" for w, s in anc_nbrs) or "(not in vocab)"
+        mod_str = ", ".join(f"{w}({s:.3f})" for w, s in mod_nbrs) or "(not in vocab)"
+
         table.add_row(word, anc_str, mod_str)
         output_lines.append(f"  {word}:\n")
         output_lines.append(f"    Tang:   {anc_str}\n")
@@ -226,7 +231,7 @@ def analyze_pmi_collocates(
         console.print("[red]No corpus data provided for PMI collocates.[/red]")
         return output_lines, None, None, None, None, None, None
 
-    header = f"Top-{topn} PMI Collocates (character-level, window={pmi_window})"
+    header = f"Top {topn} PMI Collocates (character-level, window={pmi_window})"
     output_lines.append(f"\n{header}\n" + "=" * 80 + "\n")
 
     table = Table(
