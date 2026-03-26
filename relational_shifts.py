@@ -60,10 +60,9 @@ def build_auto_anchors(model_classical, model_modern,
 
     # Take top N most stable, excluding single-char functional words
     # that are too ambiguous (了, 的, 也, 而, 以, 于, 乃, 乎)
-    functional = set('了的也而以于乃乎矣焉哉耳')
     anchors = [
         w for w, sim in stabilities
-        if w not in functional and sim > 0.3
+        if sim > 0.3
     ][:max_anchors]
 
     print(f"Selected {len(anchors)} stable anchors")

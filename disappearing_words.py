@@ -100,7 +100,7 @@ def plot_zipf(ax, top50, color, title, xlabel, ylabel):
 
 #---- Computing disappeared words---
 def compute_disappeared(classical_poems, modern_poems):
-
+ 
     classical_chars = Counter(
         ch for sent in classical_poems
         for ch in sent if is_standard_cjk(ch)
@@ -109,30 +109,34 @@ def compute_disappeared(classical_poems, modern_poems):
         ch for sent in modern_poems
         for ch in sent if is_standard_cjk(ch)
     )
-
+ 
     disappeared_classical = {
         ch: count for ch, count in classical_chars.items()
         if ch not in modern_chars
-        and is_standard_cjk(ch)
     }
     disappeared_modern = {
         ch: count for ch, count in modern_chars.items()
         if ch not in classical_chars
-        and is_standard_cjk(ch)
     }
-
-    disappeared_classical_sorted = sorted(disappeared_classical.items(), key=lambda x: x[1], reverse=True)
-    disappeared_modern_sorted    = sorted(disappeared_modern.items(),    key=lambda x: x[1], reverse=True)
-
+ 
+    disappeared_classical_sorted = sorted(
+        disappeared_classical.items(), key=lambda x: x[1], reverse=True
+    )
+    disappeared_modern_sorted = sorted(
+        disappeared_modern.items(), key=lambda x: x[1], reverse=True
+    )
+ 
     return {
         "count_disappeared_classical": len(disappeared_classical),
-        "count_disappeared_modern": len(disappeared_modern),
-        "top20_classical": disappeared_classical_sorted[:20],
-        "top50_classical": disappeared_classical_sorted[:50],
-        "top20_modern":    disappeared_modern_sorted[:20],
-        "top50_modern":    disappeared_modern_sorted[:50],
-        "classical_chars": classical_chars,
-        "modern_chars":    modern_chars,
+        "count_disappeared_modern":    len(disappeared_modern),
+        "all_classical":               disappeared_classical_sorted,
+        "all_modern":                  disappeared_modern_sorted,
+        "top20_classical":             disappeared_classical_sorted[:20],
+        "top50_classical":             disappeared_classical_sorted[:50],
+        "top20_modern":                disappeared_modern_sorted[:20],
+        "top50_modern":                disappeared_modern_sorted[:50],
+        "classical_chars":             classical_chars,
+        "modern_chars":                modern_chars,
     }
 
 
