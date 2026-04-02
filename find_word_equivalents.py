@@ -102,3 +102,4 @@ if __name__ == "__main__":
             continue  # or log it if you want to track which ones
         equiv_str = "  ".join([f"{w}({s:.3f})" for w, s in equivalents])
         print(f"  {ch} (freq {freq}): {equiv_str}")
+

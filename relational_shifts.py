@@ -68,9 +68,30 @@ def build_auto_anchors(model_classical, model_modern,
     print(f"Selected {len(anchors)} stable anchors")
     print(f"Top 20 most stable: {anchors[:20]}")
     print(f"Stability scores: {[round(s,3) for _,s in stabilities[:20]]}")
+
+    ### check the stability
+    import matplotlib.pyplot as plt
+
+    # stabilities is a list of (word, similarity) sorted descending
+    top_n = 500
+    if len(stabilities) >= top_n:
+        cutoff_sim = stabilities[top_n - 1][1]  # cosine similarity of the 500th anchor
+    else:
+        cutoff_sim = stabilities[-1][1]  # if fewer than 500, take the last one
+
+    stabilities_only = [sim for _, sim in stabilities]
+
+    plt.hist(stabilities_only, bins=50, color='skyblue', edgecolor='black')
+    plt.axvline(cutoff_sim, color='red', linestyle='--', label=f'500th anchor cutoff ({cutoff_sim:.3f})')
+    plt.xlabel("Cosine similarity (stability)")
+    plt.ylabel("Count")
+    plt.title("Anchor Stability Histogram")
+    plt.legend()
+    plt.show()
+
     return anchors
 
-# --- Updated functions using aligned space ---
+# Updated functions using aligned space 
 def cosine_sim(v1, v2):
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 

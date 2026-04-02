@@ -1,77 +1,187 @@
-from sentence_transformers import SentenceTransformer
-from keybert import KeyBERT
+import re
+import itertools
+import json
+from pathlib import Path
 import numpy as np
-from sklearn.decomposition import NMF
-from sklearn.feature_extraction.text import TfidfVectorizer
-from collections import defaultdict
+from matplotlib import rcParams
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
+from turftopic import KeyNMF
 from count_ancient_tokens import classical_poems
 from count_modern_tokens import modern_poems
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import CountVectorizer
+from functools import lru_cache
 
-# Reconstruct plain strings from your token lists
-classical_docs = ["".join(tokens) for tokens in classical_poems]
-modern_docs    = ["".join(tokens) for tokens in modern_poems]
-all_docs = classical_docs + modern_docs
+@lru_cache(maxsize=None)
+def embed_word(word):
+    return embedding_model.encode(word)
 
-# Classical — character-level TF-IDF
-vectorizer_c = TfidfVectorizer(analyzer="char", ngram_range=(1, 2), max_features=5000)
-tfidf_classical = vectorizer_c.fit_transform(classical_docs)
-nmf_c = NMF(n_components=8, random_state=42).fit(tfidf_classical)
-feature_names_c = vectorizer_c.get_feature_names_out()
+def embed_keywords(words):
+    return np.array([embed_word(w) for w in words])
 
-# Modern — word-level TF-IDF (jieba already tokenized)
-spaced_modern = [" ".join(tokens) for tokens in modern_sentences]
-vectorizer_m = TfidfVectorizer(analyzer="word", ngram_range=(1, 2), max_features=5000)
-tfidf_modern = vectorizer_m.fit_transform(spaced_modern)
-nmf_m = NMF(n_components=8, random_state=42).fit(tfidf_modern)
-feature_names_m = vectorizer_m.get_feature_names_out()
+rcParams['font.sans-serif'] = ['Arial Unicode MS']
+rcParams['axes.unicode_minus'] = False
 
-def top_keywords_c(i, n=10):
-    return [feature_names_c[j] for j in nmf_c.components_[i].argsort()[-n:][::-1]]
+# remove unknown characters that cannot be read
+def clean_text(tokens):
+    text = "".join(tokens)
+    text = re.sub(r"[^\u4e00-\u9fff]", "", text)
+    return text
 
-def top_keywords_m(i, n=10):
-    return [feature_names_m[j] for j in nmf_m.components_[i].argsort()[-n:][::-1]]
+classical_docs = [clean_text(tokens) for tokens in classical_poems]
+modern_docs    = [clean_text(tokens) for tokens in modern_poems]
 
-W_classical = nmf_c.transform(tfidf_classical) # weights
-W_modern    = nmf_m.transform(tfidf_modern)
+embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
-print("=== Classical topics ===")
-for i in range(8):
-    mean_weight = W_classical[:, i].mean()
-    keywords = " ".join(top_keywords_c(i))
-    print(f"Topic {i} (weight {mean_weight:.4f}): {keywords}")
+model_c = KeyNMF(n_components=15, encoder=embedding_model, top_n=15, random_state=42,
+                 vectorizer=CountVectorizer(analyzer="char", ngram_range=(1,2), min_df=1))
+model_m = KeyNMF(n_components=15, encoder=embedding_model, top_n=15, random_state=42,
+                 vectorizer=CountVectorizer(analyzer="char", ngram_range=(1,2), min_df=1))
 
-print("\n=== Modern topics ===")
-for i in range(8):
-    mean_weight = W_modern[:, i].mean()
-    keywords = " ".join(top_keywords_m(i))
-    print(f"Topic {i} (weight {mean_weight:.4f}): {keywords}")
+# -----------------------------
+# Batched fitting
+# -----------------------------
+def batched(iterable, n):
+    if n < 1:
+        raise ValueError("n must be at least one")
+    it = iter(iterable)
+    while batch := tuple(itertools.islice(it, n)):
+        yield batch
 
-#===================COMPARISON OF TOPICS ================================
-# Project both sets of topics into a shared character space for comparison
-vectorizer_shared = TfidfVectorizer(analyzer="char", ngram_range=(1, 2), max_features=8000)
-vectorizer_shared.fit(classical_docs + modern_docs)
+def extract_and_save_keywords(model, docs, filename):
+    with Path(filename).open("w") as f:
+        for batch in batched(docs, 200):
+            batch_keywords = model.extract_keywords(list(batch))
+            for kw in batch_keywords:
+                f.write(json.dumps(kw) + "\n")
 
-# Get TF-IDF representation of each topic's top keywords
-def topic_keyword_vector(keywords, vectorizer):
-    text = " ".join(keywords)
-    return vectorizer.transform([text])
+def stream_keywords(filename):
+    with Path(filename).open() as f:
+        for line in f:
+            yield json.loads(line.strip())
 
-print("=== Closest modern counterpart for each classical topic ===\n")
-for i in range(8):
-    c_keywords = top_keywords_c(i, 20)
-    c_vec = topic_keyword_vector(c_keywords, vectorizer_shared)
+def fit_from_keywords(model, filename, epochs=3):
+    for epoch in range(epochs):
+        for batch in batched(stream_keywords(filename), 200):
+            model.partial_fit(keywords=list(batch))
 
-    best_score, best_j, best_keywords = -1, -1, []
-    for j in range(8):
-        m_keywords = top_keywords_m(j, 20)
-        m_vec = topic_keyword_vector(m_keywords, vectorizer_shared)
-        score = cosine_similarity(c_vec, m_vec)[0][0]
-        if score > best_score:
-            best_score, best_j, best_keywords = score, j, m_keywords
+print("Extracting classical keywords...")
+extract_and_save_keywords(model_c, classical_docs, "keywords_c.jsonl")
+print("Extracting modern keywords...")
+extract_and_save_keywords(model_m, modern_docs, "keywords_m.jsonl")
 
-    print(f"Classical {i} → Modern {best_j}  (similarity: {best_score:.4f})")
-    print(f"  Classical: {' '.join(top_keywords_c(i, 8))}")
-    print(f"  Modern:    {' '.join(top_keywords_m(best_j, 8))}")
-    print()
+print("Fitting classical model...")
+fit_from_keywords(model_c, "keywords_c.jsonl")
+print("Fitting modern model...")
+fit_from_keywords(model_m, "keywords_m.jsonl")
 
+# -----------------------------
+# Extract top keywords per topic
+# -----------------------------
+
+def parse_topic(topic, n=10):
+    if isinstance(topic, dict):
+        items = sorted(topic.items(), key=lambda x: x[1], reverse=True)[:n]
+
+    elif isinstance(topic, list) and len(topic) > 0 and isinstance(topic[0], tuple):
+        items = topic[:n]
+
+    elif isinstance(topic, list) and len(topic) > 0 and isinstance(topic[0], str):
+        items = [(w, 1.0) for w in topic[:n]]
+
+    elif isinstance(topic, tuple) and len(topic) == 2:
+        words, scores = topic
+        items = list(zip(words[:n], scores[:n]))
+
+    else:
+        raise ValueError(f"Unexpected topic format: {type(topic)}")
+
+    words = [w for w, _ in items]
+    if len(words) == 0:
+        raise ValueError("Empty topic encountered")
+
+    scores = np.array([s for _, s in items])
+    if scores.sum() == 0:
+        scores = np.ones_like(scores) / len(scores)
+        print("SUM OF SCORES IS 0!!!!")
+    else:
+        scores = scores / scores.sum()
+
+    return words, scores
+
+def get_top_keywords(model, topic_idx, n=10):
+    topics = model.get_topics()
+    words, _ = parse_topic(topics[topic_idx], n)
+    return words
+# -----------------------------
+# Topic weights (document-topic matrix)
+# -----------------------------
+W_classical = model_c.transform(classical_docs)
+W_modern    = model_m.transform(modern_docs)
+
+# normalize
+W_classical_norm = W_classical / (W_classical.sum(axis=1, keepdims=True) + 1e-9)
+W_modern_norm    = W_modern / (W_modern.sum(axis=1, keepdims=True) + 1e-9)
+
+# -----------------------------
+# Compare topics using keyword embedding similarity
+# -----------------------------
+def get_topic_embedding(model, topic_idx, n=10):
+    topics = model.get_topics()
+    keywords, scores = parse_topic(topics[topic_idx], n)
+    return keywords, scores
+
+# Precompute once
+c_keywords_all, c_vecs_all = [], []
+for i in range(model_c.n_components):
+    kw, sc = get_topic_embedding(model_c, i)
+    embeddings = embed_keywords(kw)
+    c_keywords_all.append(kw)
+    c_vecs_all.append(np.average(embeddings, axis=0, weights=sc).reshape(1, -1))
+
+m_keywords_all, m_vecs_all = [], []
+for j in range(model_m.n_components):
+    kw, sc = get_topic_embedding(model_m, j)
+    embeddings = embed_keywords(kw)
+    m_keywords_all.append(kw)
+    m_vecs_all.append(np.average(embeddings, axis=0, weights=sc).reshape(1, -1))
+
+# -----------------------------
+# Print top correspondences + all topics
+# -----------------------------
+def print_topics_with_full_weights(n_top=10, top_n_correspondences=5):
+    similarities = []
+    for i in range(model_c.n_components):
+        for j in range(model_m.n_components):
+            score = cosine_similarity(c_vecs_all[i], m_vecs_all[j])[0][0]
+            c_weight = W_classical_norm[:, i].mean()
+            m_weight = W_modern_norm[:, j].mean()
+            similarities.append((score, i, j, c_weight, m_weight))
+
+    similarities.sort(key=lambda x: x[0], reverse=True)
+    top_correspondences = similarities[:top_n_correspondences]
+
+    print(f"=== Top {top_n_correspondences} Classical→Modern Topic Correspondences (embedding cosine similarity) ===\n")
+    for rank, (score, i, j, c_weight, m_weight) in enumerate(top_correspondences):
+        c_kw = "".join(c_keywords_all[i])
+        m_kw = "".join(m_keywords_all[j])
+        print(f"#{rank+1} Cosine Similarity: {score:.4f}")
+        print(f"  Classical Topic {i+1} (weight {c_weight:.4f}) → Modern Topic {j+1} (weight {m_weight:.4f})")
+        print(f"  Classical chars: {c_kw}")
+        print(f"  Modern chars:    {m_kw}\n")
+
+    topic_weights_c = [(i, W_classical_norm[:, i].mean()) for i in range(model_c.n_components)]
+    topic_weights_c.sort(key=lambda x: x[1], reverse=True)
+    print("=== Classical Topics (sorted by weight) ===\n")
+    for rank, (i, mean_weight) in enumerate(topic_weights_c):
+        print(f"Classical Topic {rank+1} (weight {mean_weight:.4f})")
+        print(f"  Top characters: {''.join(c_keywords_all[i])}\n")
+
+    topic_weights_m = [(i, W_modern_norm[:, i].mean()) for i in range(model_m.n_components)]
+    topic_weights_m.sort(key=lambda x: x[1], reverse=True)
+    print("=== Modern Topics (sorted by weight) ===\n")
+    for rank, (i, mean_weight) in enumerate(topic_weights_m):
+        print(f"Modern Topic {rank+1} (weight {mean_weight:.4f})")
+        print(f"  Top characters: {''.join(m_keywords_all[i])}\n")
+
+print_topics_with_full_weights(n_top=10, top_n_correspondences=5)
