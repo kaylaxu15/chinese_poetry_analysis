@@ -12,6 +12,7 @@ from count_modern_tokens import modern_poems
 from sklearn.feature_extraction.text import CountVectorizer
 from functools import lru_cache
 import joblib
+from topic_plotting import plot_topics_3d
 
 rcParams['font.sans-serif'] = ['Arial Unicode MS']
 rcParams['axes.unicode_minus'] = False
@@ -224,4 +225,6 @@ def print_topics_with_full_weights(n_top=10, top_n_correspondences=5):
         print(f"Modern Topic {rank+1} (weight {w:.4f})")
         print(f"  Top chars: {' '.join(m_keywords_all[i])}\n")
 
+
 print_topics_with_full_weights()
+plot_topics_3d(c_vecs_all, m_vecs_all, c_keywords_all, m_keywords_all)

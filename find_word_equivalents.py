@@ -9,6 +9,7 @@ from count_ancient_tokens import classical_poems
 from count_modern_tokens import modern_poems
 from analyze_semantic_shifts import is_standard_cjk
 from variant_filter import VariantFilter
+from word_cloud import plot_top15_equivalents
 
 classical_sentences = classical_poems
 modern_sentences    = modern_poems
@@ -54,7 +55,7 @@ if __name__ == "__main__":
         modern_vocab=modern_vocab,
         modern_aligned=modern_aligned,
         classical_wv=model_classical.wv,
-        unihan_path="Unihan_Variants.txt",   # download from unicode.org
+        unihan_path="Unihan_Variants.txt",
         threshold=0.85,
     )
 
@@ -99,7 +100,11 @@ if __name__ == "__main__":
     for ch, freq in truly_disappeared:
         equivalents = find_modern_equivalent(ch, model_classical, modern_aligned)
         if equivalents is None:
-            continue  # or log it if you want to track which ones
+            continue
         equiv_str = "  ".join([f"{w}({s:.3f})" for w, s in equivalents])
         print(f"  {ch} (freq {freq}): {equiv_str}")
 
+    # --- radial collocate word clouds for top 10 truly disappeared ---
+    print("\nGenerating radial equivalent plots...")
+    plot_top15_equivalents(truly_disappeared, find_modern_equivalent,
+                        model_classical, modern_aligned)

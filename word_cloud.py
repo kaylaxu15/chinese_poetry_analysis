@@ -1,113 +1,110 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from sentence_transformers import SentenceTransformer
-from collections import Counter
-from disappearing_words import top_collocates
+import json
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 cjk_font = fm.FontProperties(fname="/System/Library/Fonts/STHeiti Light.ttc")
 fm.fontManager.addfont("/System/Library/Fonts/STHeiti Light.ttc")
-FONT_NAME = cjk_font.get_name()
 
-embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+qwen_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-7B-Instruct")
+qwen_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-7B-Instruct", torch_dtype=torch.float16, device_map="auto")
 
-def cosine_sim(a, b):
-    a, b = np.array(a), np.array(b)
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9))
+def get_translations(words):
+    """Fetch single-character English translations using Qwen."""
+    prompt = (
+        f"Translate each of these Chinese characters individually into a single English word: "
+        f"{', '.join(words)}. "
+        f"Respond with only a JSON object mapping each character to one English word, "
+        f"e.g. {{\"风\": \"wind\", \"水\": \"water\"}}. "
+        f"One word per character, no phrases, no explanations, no other text."
+    )
+    messages = [{"role": "user", "content": prompt}]
+    text = qwen_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = qwen_tokenizer(text, return_tensors="pt").to(qwen_model.device)
+    with torch.no_grad():
+        outputs = qwen_model.generate(**inputs, max_new_tokens=300, do_sample=False)
+    response = qwen_tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        return {w: "" for w in words}
 
-def plot_radial_collocates(center_char, collocates, title, filename, color):
+def plot_radial_equivalents(center_char, equivalents, title, filename, color):
     """
-    collocates: list of (char, bigram_freq) tuples
-    Positions each collocate at angle=evenly spaced, radius=1-cosine_sim (closer=more similar)
-    Font size scales with bigram frequency.
+    equivalents: list of (word, cosine_sim_score) tuples from find_modern_equivalent()
     """
-    if not collocates:
+    if not equivalents:
         return
 
-    center_vec = embedding_model.encode(center_char, normalize_embeddings=True)
+    words, sims = zip(*equivalents)
+    sims = np.array(sims, dtype=float)
 
-    # Compute cosine similarity and distance for each collocate
-    words, freqs = zip(*collocates)
-    vecs = embedding_model.encode(list(words), normalize_embeddings=True)
-    sims = np.array([cosine_sim(center_vec, v) for v in vecs])
+    # Fetch translations for all words in one call
+    translations = get_translations(list(words))
 
-    # Radius: low similarity → far from center. Scale to [0.2, 0.9] of plot radius.
-    # Invert: distance = 1 - sim, then remap to [0.2, 0.9]
-    raw_dist = 1.0 - sims
-    d_min, d_max = raw_dist.min(), raw_dist.max()
-    if d_max - d_min < 1e-6:
-        norm_dist = np.full_like(raw_dist, 0.5)
-    else:
-        norm_dist = 0.2 + 0.7 * (raw_dist - d_min) / (d_max - d_min)
+    # Distance: map cosine sim [0, 1] directly to radius [0.9, 0.2]
+    norm_dist = 0.9 - 0.7 * sims
 
-    # Evenly spread angles, offset by a little so nothing sits at 0°
+    # Evenly spread angles
     n = len(words)
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False) + np.pi / n
 
-    # Font size: scale with frequency, range [10, 22]
-    freqs_arr = np.array(freqs, dtype=float)
-    f_min, f_max = freqs_arr.min(), freqs_arr.max()
-    if f_max - f_min < 1e-6:
-        font_sizes = np.full(n, 14.0)
-    else:
-        font_sizes = 10 + 12 * (freqs_arr - f_min) / (f_max - f_min)
+    # Font size: higher similarity → larger, range [10, 24]
+    font_sizes = 10 + 14 * (sims - sims.min()) / (sims.max() - sims.min() + 1e-9)
 
-    # Alpha: scale with similarity [0.45, 1.0]
-    alphas = 0.45 + 0.55 * (sims - sims.min()) / (sims.max() - sims.min() + 1e-9)
-
-    fig, ax = plt.subplots(figsize=(7, 7), facecolor='white')
+    fig, ax = plt.subplots(figsize=(9, 9), facecolor='white')
     ax.set_aspect('equal')
     ax.axis('off')
 
-    RADIUS = 3.2  # coordinate radius of the plot area
+    RADIUS = 3.2
 
-    # Draw faint reference rings
+    # Faint reference rings
     for r_frac in [0.33, 0.66, 1.0]:
         ring = plt.Circle((0, 0), RADIUS * r_frac, fill=False,
                            color='#cccccc', linewidth=0.5, linestyle='--', zorder=0)
         ax.add_patch(ring)
 
-    # Draw center character
+    # Center character
     center_circle = plt.Circle((0, 0), 0.38, color=color, zorder=3, alpha=0.15)
     ax.add_patch(center_circle)
     ax.text(0, 0, center_char, ha='center', va='center',
             fontproperties=cjk_font, fontsize=28, fontweight='bold',
             color=color, zorder=4)
 
-    # Draw collocates
-    for i, (word, freq) in enumerate(zip(words, freqs)):
+    # Equivalents
+    for i, word in enumerate(words):
         x = norm_dist[i] * RADIUS * np.cos(angles[i])
         y = norm_dist[i] * RADIUS * np.sin(angles[i])
 
-        # Thin leader line from center edge to word
-        line_start = 0.42  # just outside center circle
-        lx = line_start * np.cos(angles[i])
-        ly = line_start * np.sin(angles[i])
+        lx = 0.42 * np.cos(angles[i])
+        ly = 0.42 * np.sin(angles[i])
         ax.plot([lx, x * 0.88], [ly, y * 0.88],
                 color='#cccccc', linewidth=0.5, zorder=1)
 
-        ax.text(x, y, word,
+        translation = translations.get(word, "")
+        label = f"{word}: {translation} ({sims[i]:.2f})" if translation else f"{word} ({sims[i]:.2f})"
+
+        # CJK character in larger font
+        ax.text(x, y + 0.15, word,
                 ha='center', va='center',
                 fontproperties=cjk_font,
-                fontsize=font_sizes[i],
+                fontsize=float(font_sizes[i]),
                 color=color,
-                alpha=float(alphas[i]),
+                zorder=2)
+        # Translation and score in smaller font below
+        ax.text(x, y - 0.22, f"{translation} ({sims[i]:.2f})" if translation else f"({sims[i]:.2f})",
+                ha='center', va='center',
+                fontsize=float(font_sizes[i]) * 0.6,
+                color=color,
                 zorder=2)
 
-    # Ring annotations
-    ax.text(RADIUS * 0.33 + 0.08, 0.08, 'high sim',
-            fontsize=8, color='#aaaaaa', va='bottom')
-    ax.text(RADIUS * 1.0 + 0.08, 0.08, 'low sim',
-            fontsize=8, color='#aaaaaa', va='bottom')
-
-    ax.set_xlim(-RADIUS - 0.6, RADIUS + 1.2)
-    ax.set_ylim(-RADIUS - 0.6, RADIUS + 0.6)
-
+    ax.set_xlim(-RADIUS - 0.8, RADIUS + 0.8)
+    ax.set_ylim(-RADIUS - 0.8, RADIUS + 0.8)
     ax.set_title(title, fontproperties=cjk_font, fontsize=13, pad=12, color='#333333')
-
-    # Subtitle
     fig.text(0.5, 0.02,
-             'Distance = semantic similarity   |   Font size = bigram frequency',
+             'Distance and size = semantic similarity   |   Closer and larger = more similar',
              ha='center', fontsize=8, color='#999999')
 
     plt.tight_layout(rect=[0, 0.04, 1, 1])
@@ -116,17 +113,12 @@ def plot_radial_collocates(center_char, collocates, title, filename, color):
     print(f"Saved: {filename}")
 
 
-def plot_top10_radial(results, classical_bigrams, modern_bigrams):
-    configs = [
-        (results["top20_classical"][:10], classical_bigrams, '#7F77DD', 'classical'),
-        (results["top20_modern"][:10],    modern_bigrams,    '#1D9E75', 'modern'),
-    ]
-
-    for top10, bigrams, color, label in configs:
-        for rank, (ch, freq) in enumerate(top10):
-            collocates = top_collocates(ch, bigrams, n=12)
-            if not collocates:
-                continue
-            title = f'"{ch}"  (freq {freq}) — top collocates in {label} corpus'
-            filename = f'radial_{label}_{rank+1:02d}_{ch}.png'
-            plot_radial_collocates(ch, collocates, title, filename, color)
+def plot_top15_equivalents(truly_disappeared, find_modern_equivalent_fn,
+                           model_classical, modern_aligned):
+    for rank, (ch, freq) in enumerate(truly_disappeared[:15]):
+        equivalents = find_modern_equivalent_fn(ch, model_classical, modern_aligned, topn=10)
+        if not equivalents:
+            continue
+        title = f'"{ch}"  (freq {freq}) — modern equivalents'
+        filename = f'radial_equiv_{rank+1:02d}_{ch}.png'
+        plot_radial_equivalents(ch, equivalents, title, filename, color='#7F77DD')

@@ -11,6 +11,7 @@ from count_ancient_tokens import classical_poems
 from count_modern_tokens import modern_poems
 from sklearn.feature_extraction.text import CountVectorizer
 import joblib
+from topic_plotting import plot_topics_3d
 
 rcParams['font.sans-serif'] = ['Arial Unicode MS']
 rcParams['axes.unicode_minus'] = False
@@ -55,8 +56,11 @@ if model_c_file.exists() and model_m_file.exists():
         joblib.dump(model_m, model_m_file)
 else:
     print("No saved models found — creating and fitting new models...")
+
     model_c = KeyNMF(n_components=15, encoder=embedding_model, top_n=15, random_state=42,
                      vectorizer=CountVectorizer(analyzer="char", ngram_range=(1, 2), min_df=1))
+    
+    
     model_m = KeyNMF(n_components=15, encoder=embedding_model, top_n=15, random_state=42,
                      vectorizer=CountVectorizer(analyzer="char", ngram_range=(1, 2), min_df=1))
     model_c.fit(classical_docs)
@@ -128,16 +132,14 @@ def get_top_keywords(model, topic_idx, n=10):
 # -----------------------------
 W_classical = model_c.transform(classical_docs)
 W_modern    = model_m.transform(modern_docs)
-W_classical_norm = W_classical / (W_classical.sum(axis=1, keepdims=True) + 1e-9)
-W_modern_norm    = W_modern / (W_modern.sum(axis=1, keepdims=True) + 1e-9)
 
 # -----------------------------
 # Topic vectors: weighted average of poem embeddings
 # -----------------------------
-def compute_topic_vectors(W_norm, poem_embeddings):
+def compute_topic_vectors(W, poem_embeddings):
     topic_vecs = []
-    for i in range(W_norm.shape[1]):
-        weights = W_norm[:, i]
+    for i in range(W.shape[1]):
+        weights = W[:, i]
         weights = weights / (weights.sum() + 1e-9)
         vec = (weights[:, np.newaxis] * poem_embeddings).sum(axis=0)
         vec = vec / (np.linalg.norm(vec) + 1e-9)
@@ -145,10 +147,10 @@ def compute_topic_vectors(W_norm, poem_embeddings):
     return topic_vecs
 
 print("Computing classical topic vectors from poem embeddings...")
-c_vecs_all = compute_topic_vectors(W_classical_norm, poem_embeddings_c)
+c_vecs_all = compute_topic_vectors(W_classical, poem_embeddings_c)
 
 print("Computing modern topic vectors from poem embeddings...")
-m_vecs_all = compute_topic_vectors(W_modern_norm, poem_embeddings_m)
+m_vecs_all = compute_topic_vectors(W_modern, poem_embeddings_m)
 
 # Keywords for display only
 c_keywords_all = [get_top_keywords(model_c, i) for i in range(model_c.n_components)]
@@ -162,8 +164,8 @@ def print_topics_with_full_weights(top_n_correspondences=5):
     for i in range(model_c.n_components):
         for j in range(model_m.n_components):
             score = cosine_similarity(c_vecs_all[i], m_vecs_all[j])[0][0]
-            c_weight = W_classical_norm[:, i].mean()
-            m_weight = W_modern_norm[:, j].mean()
+            c_weight = W_classical[:, i].mean()
+            m_weight = W_modern[:, j].mean()
             similarities.append((score, i, j, c_weight, m_weight))
 
     similarities.sort(key=lambda x: x[0], reverse=True)
@@ -176,7 +178,7 @@ def print_topics_with_full_weights(top_n_correspondences=5):
         print(f"  Modern keywords:    {' '.join(m_keywords_all[j])}\n")
 
     topic_weights_c = sorted(
-        [(i, W_classical_norm[:, i].mean()) for i in range(model_c.n_components)],
+        [(i, W_classical[:, i].mean()) for i in range(model_c.n_components)],
         key=lambda x: x[1], reverse=True
     )
     print("=== Classical Topics (sorted by weight) ===\n")
@@ -185,7 +187,7 @@ def print_topics_with_full_weights(top_n_correspondences=5):
         print(f"  Top keywords: {' '.join(c_keywords_all[i])}\n")
 
     topic_weights_m = sorted(
-        [(i, W_modern_norm[:, i].mean()) for i in range(model_m.n_components)],
+        [(i, W_modern[:, i].mean()) for i in range(model_m.n_components)],
         key=lambda x: x[1], reverse=True
     )
     print("=== Modern Topics (sorted by weight) ===\n")
@@ -194,3 +196,9 @@ def print_topics_with_full_weights(top_n_correspondences=5):
         print(f"  Top keywords: {' '.join(m_keywords_all[i])}\n")
 
 print_topics_with_full_weights()
+
+c_weights = np.array([W_classical[:, i].mean() for i in range(model_c.n_components)])
+m_weights = np.array([W_modern[:, j].mean() for j in range(model_m.n_components)])
+
+plot_topics_3d(c_vecs_all, m_vecs_all, c_keywords_all, m_keywords_all,
+               c_weights, m_weights)

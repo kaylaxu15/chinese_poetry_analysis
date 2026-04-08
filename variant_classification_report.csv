@@ -96,7 +96,7 @@ character,frequency,is_variant,filter_layer,reason,modern_equivalents
 畧,40,True,1,Unihan variant of {'略'},略
 輙,39,False,,passed all layers — likely truly disappeared,
 湼,39,True,1,Unihan variant of {'涅'},涅
-胷,37,True,1,"Unihan variant of {'匈', '胸'}","匈, 胸"
+胷,37,True,1,"Unihan variant of {'胸', '匈'}","匈, 胸"
 廐,36,True,1,Unihan variant of {'厩'},厩
 畋,35,False,,passed all layers — likely truly disappeared,
 揜,35,True,1,Unihan variant of {'掩'},掩
@@ -629,7 +629,7 @@ character,frequency,is_variant,filter_layer,reason,modern_equivalents
 姧,3,False,,passed all layers — likely truly disappeared,
 酅,3,False,,passed all layers — likely truly disappeared,
 碔,3,False,,passed all layers — likely truly disappeared,
-卍,3,True,1,"Unihan variant of {'卐', '万'}","万, 卐"
+卍,3,True,1,"Unihan variant of {'万', '卐'}","万, 卐"
 攅,3,False,,passed all layers — likely truly disappeared,
 閴,3,False,,passed all layers — likely truly disappeared,
 煗,3,False,,passed all layers — likely truly disappeared,
