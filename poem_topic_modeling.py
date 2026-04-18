@@ -11,7 +11,7 @@ from count_ancient_tokens import classical_poems
 from count_modern_tokens import modern_poems
 from sklearn.feature_extraction.text import CountVectorizer
 import joblib
-from topic_plotting import plot_topics_3d
+from topic_plotting import plot_topics_2d
 
 rcParams['font.sans-serif'] = ['Arial Unicode MS']
 rcParams['axes.unicode_minus'] = False
@@ -200,5 +200,5 @@ print_topics_with_full_weights()
 c_weights = np.array([W_classical[:, i].mean() for i in range(model_c.n_components)])
 m_weights = np.array([W_modern[:, j].mean() for j in range(model_m.n_components)])
 
-plot_topics_3d(c_vecs_all, m_vecs_all, c_keywords_all, m_keywords_all,
+plot_topics_2d(c_vecs_all, m_vecs_all, c_keywords_all, m_keywords_all,
                c_weights, m_weights)
