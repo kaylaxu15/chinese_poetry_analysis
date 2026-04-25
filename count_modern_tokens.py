@@ -7,7 +7,7 @@ from collections import Counter
 import opencc
 converter = opencc.OpenCC('t2s')
 
-STOP_WORDS = set('的一是不了在我有他这就和你对为之而及且其上来无里何') # most common 25 functional words
+STOP_WORDS = set('的一是不了在我有他这就你子中为之而及且其上来无里何') # most common 25 functional words
 
 def clean(text):
     text = re.sub(r'【.*?】', '', text)  # strip 【京本作X】 style notes
@@ -71,11 +71,10 @@ if __name__ == "__main__":
     # token counting
     print(f"Total tokens: {sum(token_counter.values())}")
     print(f"Total unique tokens: {len(token_counter)}")
-    print(f"Top {len(most_common_tokens)} most common tokens (with counts):")
+    print(f"Top 20 most common tokens (with counts):")
 
-    for token, count in most_common_tokens:
+    for token, count in most_common_tokens[:20]:
         print(f"{token}: {count}")
 
-    print([token for token, count in most_common_tokens])
     print("Flower count: ", token_counter["花"])
 

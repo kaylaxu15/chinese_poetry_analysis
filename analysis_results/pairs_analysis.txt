@@ -1,14 +1,12 @@
 
 PAIR COSINE SIMILARITY
 ================================================================================
-  person–moon   (nature/romance)     Tang=0.2054  Modern=0.2277  Δ=+0.0223
-  person–dream  (dream)              Tang=0.2255  Modern=0.2419  Δ=+0.0164
-  person–flower (nature/beauty)      Tang=0.3187  Modern=0.4013  Δ=+0.0826
-  moon–dream    (romanticized dream) Tang=0.3258  Modern=0.4313  Δ=+0.1055
+  person–moon   (nature/romance)     Tang=0.1799  Modern=0.2599  Δ=+0.0800
+  person–dream  (dream)              Tang=0.2457  Modern=0.2712  Δ=+0.0256
+  person–flower (nature/beauty)      Tang=0.2496  Modern=0.3968  Δ=+0.1471
 
 PAIR PPMI (window=3)
 ================================================================================
-  person–moon   (nature/romance)     Tang=0.6010  Modern=0.8831  Δ=+0.2820
-  person–dream  (dream)              Tang=0.9785  Modern=0.8535  Δ=-0.1249
-  person–flower (nature/beauty)      Tang=0.6350  Modern=0.7616  Δ=+0.1266
-  moon–dream    (romanticized dream) Tang=1.2231  Modern=0.9780  Δ=-0.2451
+  person–moon   (nature/romance)     Tang=0.6254  Modern=0.8623  Δ=+0.2369
+  person–dream  (dream)              Tang=0.9972  Modern=0.8571  Δ=-0.1401
+  person–flower (nature/beauty)      Tang=0.6148  Modern=0.7534  Δ=+0.1386

@@ -43,7 +43,7 @@ def build_figure(c_vecs_all, m_vecs_all, c_keywords_all, m_keywords_all, c_weigh
     fig.add_trace(go.Scatter(
         x=line_x, y=line_y,
         mode='lines',
-        line=dict(color='#35063e', width=2),
+        line=dict(color='rgba(53, 6, 62, 0.4)', width=0.5),
         hoverinfo='skip',
         showlegend=False
     ))

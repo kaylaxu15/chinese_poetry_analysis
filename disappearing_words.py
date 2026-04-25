@@ -85,6 +85,42 @@ def plot_collocate_heatmap(top20, bigrams, all_chars, color, title, filename):
     print(f"Saved: {filename}")
 
 # ── side-by-side Zipf plots ───────────────────────────────────────────────────
+
+# full frequency analysis
+def plot_zipf_full_corpora(classical_poems, modern_poems):
+    classical_chars = Counter(
+        ch for sent in classical_poems
+        for ch in sent if is_standard_cjk(ch)
+    )
+    modern_chars = Counter(
+        ch for sent in modern_poems
+        for ch in sent if is_standard_cjk(ch)
+    )
+
+    top50_classical_full = classical_chars.most_common(50)
+    top50_modern_full = modern_chars.most_common(50)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
+
+    plot_zipf(ax1, top50_classical_full,
+              color='#7F77DD',
+              title='Top 50 Characters in Classical Corpus',
+              xlabel='Character ranked by frequency',
+              ylabel='Frequency in classical corpus')
+
+    plot_zipf(ax2, top50_modern_full,
+              color='#1D9E75',
+              title='Top 50 Characters in Modern Corpus',
+              xlabel='Character ranked by frequency',
+              ylabel='Frequency in modern corpus')
+
+    plt.subplots_adjust(wspace=0.3)
+    plt.tight_layout()
+    plt.savefig("full_corpora_zipf.png", dpi=150)
+    plt.show()
+    print("Saved: full_corpora_zipf.png")
+
+# disappeared character plots
 def plot_zipf(ax, top50, color, title, xlabel, ylabel):
     chars  = [ch for ch, _ in top50]
     counts = [ct for _, ct in top50]
@@ -92,6 +128,20 @@ def plot_zipf(ax, top50, color, title, xlabel, ylabel):
     ax.bar(ranks, counts, color=color, width=0.7, alpha=0.85)
     ax.set_xticks(ranks)
     ax.set_xticklabels(chars, fontproperties=cjk_font, fontsize=10)
+    ax.set_title(title, fontproperties=cjk_font, fontsize=13)
+    ax.set_xlabel(xlabel, fontsize=11)
+    ax.set_ylabel(ylabel, fontsize=11)
+    ax.set_yscale('log')
+    ax.grid(axis='y', linestyle='--', alpha=0.4)
+
+def plot_zipf_full(ax, top50, color, title, xlabel, ylabel):
+    chars  = [ch for ch, _ in top50]
+    counts = [ct for _, ct in top50]
+    ranks  = list(range(1, len(top50) + 1))
+    ax.bar(ranks, counts, color=color, width=0.7, alpha=0.85)
+    ax.set_xticks(ranks)
+    ax.set_xticklabels(chars, fontproperties=cjk_font, fontsize=8,
+                       rotation=45, ha='right')
     ax.set_title(title, fontproperties=cjk_font, fontsize=13)
     ax.set_xlabel(xlabel, fontsize=11)
     ax.set_ylabel(ylabel, fontsize=11)
@@ -168,7 +218,7 @@ if __name__== "__main__":
 
     plot_zipf(ax1, top50_classical,
             color='#7F77DD',
-            title=f'Characters Found Only in Ancient Corpus: Total of {disappeared_classical_count}',
+            title=f'Characters Found Only in Classical Corpus: Total of {disappeared_classical_count}',
             xlabel='Character ranked by classical frequency',
             ylabel='Frequency in classical corpus')
 
@@ -201,16 +251,18 @@ if __name__== "__main__":
         print(f"  {ch} (freq {freq}): {collocate_str}")
 
 
-    plot_collocate_heatmap(
-        top20_classical, classical_bigrams, classical_chars,
-        color='blue',
-        title='Heatmap of Collocates of Classical-Only Characters',
-        filename='collocates_classical.png'
-    )
+    # plot_collocate_heatmap(
+    #     top20_classical, classical_bigrams, classical_chars,
+    #     color='blue',
+    #     title='Heatmap of Collocates of Classical-Only Characters',
+    #     filename='collocates_classical.png'
+    # )
 
-    plot_collocate_heatmap(
-        top20_modern, modern_bigrams, modern_chars,
-        color='green',
-        title='Heatmap of Collocates of Modern-Only Character',
-        filename='collocates_modern.png'
-    )
+    # plot_collocate_heatmap(
+    #     top20_modern, modern_bigrams, modern_chars,
+    #     color='green',
+    #     title='Heatmap of Collocates of Modern-Only Character',
+    #     filename='collocates_modern.png'
+    # )
+
+    plot_zipf_full_corpora(classical_poems, modern_poems)

@@ -18,7 +18,6 @@ PAIRS = [
     ("人", "月", "person–moon   (nature/romance)"),
     ("人", "梦", "person–dream  (dream)"),
     ("人", "花", "person–flower (nature/beauty)"),
-    ("月", "梦", "moon–dream    (romanticized dream)"),
 ]
 
 def is_standard_cjk(ch):

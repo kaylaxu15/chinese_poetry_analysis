@@ -85,14 +85,14 @@ mod_uni, mod_cooc, mod_total = build_cooccurrence(modern_chars,  window=PMI_WIND
 output_lines = []
 analyze_nearest_neighbours(
     ancient_model, modern_model,
-    words=["山", "风", "天", "花"],
+    words=["风", "山", "天", "花", "水"],
     topn=10,
     output_lines=output_lines,
 )
 analyze_pmi_collocates(
     anc_uni=anc_uni, anc_cooc=anc_cooc, anc_total=anc_total,
     mod_uni=mod_uni, mod_cooc=mod_cooc, mod_total=mod_total,
-    words=["山", "风", "天", "花"],
+    words=["风", "山", "天", "花", "水"],
     topn=10,
     pmi_window=PMI_WINDOW,
     output_lines=output_lines,
